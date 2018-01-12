@@ -1,3 +1,4 @@
+// Package semaphore provides a bounded resources implementation.
 package semaphore
 
 import (
