@@ -126,6 +126,11 @@ func (c *client) Do(req *http.Request, maxTries int) (tries, status int, body []
 	for tries = 1; tries <= maxTries; tries++ {
 		// update next sleep time
 		wait = c.bk.Next(wait)
+		// force reset Body if possible,
+		// to avoid error: http: ContentLength=n with Body length 0
+		if tries > 1 && req.Body != nil && req.GetBody != nil {
+			req.Body, _ = req.GetBody()
+		}
 		// do request
 		status, body, err = RequestWithClose(c.cl, req)
 		if err != nil {
