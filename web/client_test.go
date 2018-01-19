@@ -1,8 +1,11 @@
 package web_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -35,6 +38,7 @@ func TestNewJSONPost(t *testing.T) {
 
 func DummyHandler(code int, content []byte) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ioutil.ReadAll(r.Body)
 		w.WriteHeader(code)
 		w.Write(content)
 	}
@@ -42,8 +46,8 @@ func DummyHandler(code int, content []byte) http.HandlerFunc {
 
 func SleepHandler(d time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
 		time.Sleep(d)
+		w.WriteHeader(http.StatusOK)
 	}
 }
 
@@ -273,6 +277,57 @@ func TestClientOptions(t *testing.T) {
 		if test.expectTimeout {
 			a.NotNil(err, "Should return timeout error")
 			a.Equal(true, web.IsTimeoutErr(err), "Should be a timeout")
+		} else {
+			a.NoError(err, "Request succeeds")
+			a.Equal(test.expectedCode, status, "Returns code")
+			a.Equal(test.expectedBody, body, "Returns body")
+		}
+		a.Equal(test.tries, n, "Report retried times")
+
+		server.Close()
+	}
+}
+
+func TestClientDoPostWithBody(t *testing.T) {
+	a := assert.NewAssert(t)
+
+	tests := []retryTest{
+		{
+			closeTest{
+				DummyHandler(http.StatusInternalServerError, errResp),
+				http.StatusInternalServerError,
+				errResp,
+				false,
+			},
+			5,
+			5,
+		},
+		{
+			closeTest{
+				SleepHandler(50 * time.Millisecond),
+				http.StatusOK,
+				okResp,
+				true,
+			},
+			5,
+			5,
+		},
+	}
+
+	cl := web.NewClient(web.WithHTTPClient(&http.Client{Timeout: 10 * time.Millisecond}))
+
+	for _, test := range tests {
+		server := httptest.NewServer(test.h)
+
+		req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer([]byte("foo-bar")))
+		if err != nil {
+			t.Errorf("Error new request: %s", err)
+			continue
+		}
+		n, status, body, err := cl.Do(req, test.maxTries)
+		if test.expectTimeout {
+			a.NotNil(err, "Should return timeout error")
+			a.Equal(true, web.IsTimeoutErr(err), fmt.Sprintf("Should be a timeout: %v", err))
 		} else {
 			a.NoError(err, "Request succeeds")
 			a.Equal(test.expectedCode, status, "Returns code")
