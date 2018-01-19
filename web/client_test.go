@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -44,8 +43,11 @@ func DummyHandler(code int, content []byte) http.HandlerFunc {
 	}
 }
 
-func SleepHandler(d time.Duration) http.HandlerFunc {
+func SleepHandler(d time.Duration, read bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if read {
+			ioutil.ReadAll(r.Body)
+		}
 		time.Sleep(d)
 		w.WriteHeader(http.StatusOK)
 	}
@@ -58,6 +60,7 @@ var (
 )
 
 type closeTest struct {
+	desp          string
 	h             http.Handler
 	expectedCode  int
 	expectedBody  []byte
@@ -70,13 +73,22 @@ func TestRequestWithClose(t *testing.T) {
 
 	tests := []closeTest{
 		{
+			"case normal handler: ",
 			okHandler,
 			http.StatusOK,
 			okResp,
 			false,
 		},
 		{
-			SleepHandler(20 * time.Millisecond),
+			"case read all then timeout: ",
+			SleepHandler(20*time.Millisecond, true),
+			http.StatusOK,
+			nil,
+			true,
+		},
+		{
+			"case just timeout: ",
+			SleepHandler(20*time.Millisecond, false),
 			http.StatusOK,
 			nil,
 			true,
@@ -88,19 +100,19 @@ func TestRequestWithClose(t *testing.T) {
 	for _, test := range tests {
 		server := httptest.NewServer(test.h)
 
-		req, err := http.NewRequest("GET", server.URL, nil)
+		req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer([]byte("foo")))
 		if err != nil {
 			t.Errorf("Error new request: %s", err)
 			continue
 		}
 		status, body, err := web.RequestWithClose(cl, req)
 		if test.expectTimeout {
-			a.NotNil(err, "Should return timeout error")
-			a.Equal(true, web.IsTimeoutErr(err), "Should be a timeout")
+			a.NotNil(err, test.desp+"should return timeout error")
+			a.Equal(true, web.IsTimeoutErr(err), test.desp+err.Error()+" should be a timeout")
 		} else {
-			a.NoError(err, "Request succeeds")
-			a.Equal(test.expectedCode, status, "Returns code")
-			a.Equal(test.expectedBody, body, "Returns body")
+			a.NoError(err, test.desp+"request succeeds")
+			a.Equal(test.expectedCode, status, test.desp+"check code")
+			a.Equal(test.expectedBody, body, test.desp+"check body")
 		}
 
 		server.Close()
@@ -179,6 +191,7 @@ func TestClientDo(t *testing.T) {
 	tests := []retryTest{
 		{
 			closeTest{
+				"case OK handler: ",
 				okHandler,
 				http.StatusOK,
 				okResp,
@@ -189,111 +202,7 @@ func TestClientDo(t *testing.T) {
 		},
 		{
 			closeTest{
-				DummyHandler(http.StatusInternalServerError, errResp),
-				http.StatusInternalServerError,
-				errResp,
-				false,
-			},
-			5,
-			5,
-		},
-	}
-
-	cl := web.NewClient()
-
-	for _, test := range tests {
-		server := httptest.NewServer(test.h)
-
-		req, err := http.NewRequest("GET", server.URL, nil)
-		if err != nil {
-			t.Errorf("Error new request: %s", err)
-			continue
-		}
-		n, status, body, err := cl.Do(req, test.maxTries)
-		if test.expectTimeout {
-			a.NotNil(err, "Should return timeout error")
-			a.Equal(true, web.IsTimeoutErr(err), "Should be a timeout")
-		} else {
-			a.NoError(err, "Request succeeds")
-			a.Equal(test.expectedCode, status, "Returns code")
-			a.Equal(test.expectedBody, body, "Returns body")
-		}
-		a.Equal(test.tries, n, "Report retried times")
-
-		server.Close()
-	}
-}
-
-type optionTest struct {
-	cl web.Client
-	retryTest
-}
-
-func TestClientOptions(t *testing.T) {
-	a := assert.NewAssert(t)
-
-	timeoutCl := web.NewClient(web.TimeoutOnly(),
-		web.WithHTTPClient(&http.Client{Timeout: 10 * time.Millisecond}),
-		web.WithBackoff(web.Backoff{BaseSleep: 100, MaxSleep: 200}))
-	// TODO: case for backoff?
-	tests := []optionTest{
-		{
-			timeoutCl,
-			retryTest{
-				closeTest{
-					okHandler,
-					http.StatusOK,
-					okResp,
-					false,
-				},
-				5,
-				1,
-			},
-		},
-		{
-			timeoutCl,
-			retryTest{
-				closeTest{
-					SleepHandler(50 * time.Millisecond),
-					http.StatusOK,
-					okResp,
-					true,
-				},
-				5,
-				5,
-			},
-		},
-	}
-
-	for _, test := range tests {
-		server := httptest.NewServer(test.h)
-
-		req, err := http.NewRequest("GET", server.URL, nil)
-		if err != nil {
-			t.Errorf("Error new request: %s", err)
-			continue
-		}
-		n, status, body, err := test.cl.Do(req, test.maxTries)
-		if test.expectTimeout {
-			a.NotNil(err, "Should return timeout error")
-			a.Equal(true, web.IsTimeoutErr(err), "Should be a timeout")
-		} else {
-			a.NoError(err, "Request succeeds")
-			a.Equal(test.expectedCode, status, "Returns code")
-			a.Equal(test.expectedBody, body, "Returns body")
-		}
-		a.Equal(test.tries, n, "Report retried times")
-
-		server.Close()
-	}
-}
-
-func TestClientDoPostWithBody(t *testing.T) {
-	a := assert.NewAssert(t)
-
-	tests := []retryTest{
-		{
-			closeTest{
+				"case retry on 5xx error: ",
 				DummyHandler(http.StatusInternalServerError, errResp),
 				http.StatusInternalServerError,
 				errResp,
@@ -304,13 +213,25 @@ func TestClientDoPostWithBody(t *testing.T) {
 		},
 		{
 			closeTest{
-				SleepHandler(50 * time.Millisecond),
+				"case retry read then timeout: ",
+				SleepHandler(50*time.Millisecond, true),
 				http.StatusOK,
 				okResp,
 				true,
 			},
-			5,
-			5,
+			3,
+			3,
+		},
+		{
+			closeTest{
+				"case retry just timeout: ",
+				SleepHandler(50*time.Millisecond, false),
+				http.StatusOK,
+				okResp,
+				true,
+			},
+			3,
+			3,
 		},
 	}
 
@@ -319,22 +240,24 @@ func TestClientDoPostWithBody(t *testing.T) {
 	for _, test := range tests {
 		server := httptest.NewServer(test.h)
 
-		req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer([]byte("foo-bar")))
+		req, err := http.NewRequest("POST", server.URL, bytes.NewBuffer([]byte("foo")))
 		if err != nil {
 			t.Errorf("Error new request: %s", err)
 			continue
 		}
 		n, status, body, err := cl.Do(req, test.maxTries)
 		if test.expectTimeout {
-			a.NotNil(err, "Should return timeout error")
-			a.Equal(true, web.IsTimeoutErr(err), fmt.Sprintf("Should be a timeout: %v", err))
+			a.NotNil(err, test.desp+"should return timeout error")
+			a.Equal(true, web.IsTimeoutErr(err), test.desp+err.Error()+" should be a timeout")
 		} else {
-			a.NoError(err, "Request succeeds")
-			a.Equal(test.expectedCode, status, "Returns code")
-			a.Equal(test.expectedBody, body, "Returns body")
+			a.NoError(err, test.desp+"request succeeds")
+			a.Equal(test.expectedCode, status, test.desp+"check code")
+			a.Equal(test.expectedBody, body, test.desp+"check body")
 		}
-		a.Equal(test.tries, n, "Report retried times")
+		a.Equal(test.tries, n, test.desp+"check tries")
 
 		server.Close()
 	}
 }
+
+// TODO: cases for web.TimeoutOnly web.WithBackoff
