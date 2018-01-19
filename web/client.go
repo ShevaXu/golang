@@ -35,13 +35,13 @@ func RequestWithClose(cl *http.Client, req *http.Request) (status int, body []by
 	var resp *http.Response
 
 	resp, err = cl.Do(req)
-	if err != nil {
-		return
-	}
-
 	// Close() iff resp did return
 	if resp != nil {
 		defer resp.Body.Close()
+	}
+
+	if err != nil {
+		return
 	}
 
 	status = resp.StatusCode
