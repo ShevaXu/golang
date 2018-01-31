@@ -124,6 +124,8 @@ func (c *client) Do(req *http.Request, maxTries int) (tries, status int, body []
 	wait := 0
 
 	for tries = 1; tries <= maxTries; tries++ {
+		// backoff
+		time.Sleep(time.Duration(wait) * time.Millisecond)
 		// update next sleep time
 		wait = c.bk.Next(wait)
 		// force reset Body if possible,
@@ -135,14 +137,12 @@ func (c *client) Do(req *http.Request, maxTries int) (tries, status int, body []
 		status, body, err = RequestWithClose(c.cl, req)
 		if err != nil {
 			if !c.timeoutOnly || IsTimeoutErr(err) {
-				time.Sleep(time.Duration(wait) * time.Millisecond)
 				continue
 			}
 			return
 		}
 		// no error, check status
 		if ShouldRetry(status) {
-			time.Sleep(time.Duration(wait) * time.Millisecond)
 			continue
 		}
 		// succeed or should not repeat
