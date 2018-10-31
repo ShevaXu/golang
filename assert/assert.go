@@ -89,3 +89,7 @@ func (a *Assert) NotNil(obj interface{}, msg string) {
 func NewAssert(t testing.TB) *Assert {
 	return &Assert{t}
 }
+
+// New is a func alias for NewAssert. The name
+// NewAssert is reduncdant but kept for compatibility.
+var New = NewAssert

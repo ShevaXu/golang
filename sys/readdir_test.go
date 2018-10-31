@@ -17,7 +17,7 @@ const (
 )
 
 func TestReadDir(t *testing.T) {
-	a := assert.NewAssert(t)
+	a := assert.New(t)
 
 	list1, err1 := sys.ReadDir(testDir)
 	list2, err2 := ioutil.ReadDir(testDir)
@@ -47,7 +47,7 @@ func listRecursive(name string, walkImpl func(root string, walkFn filepath.WalkF
 }
 
 func TestWalk(t *testing.T) {
-	a := assert.NewAssert(t)
+	a := assert.New(t)
 
 	list1, err1 := listRecursive(testDir, sys.Walk)
 	list2, err2 := listRecursive(testDir, filepath.Walk)

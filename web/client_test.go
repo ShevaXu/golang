@@ -20,7 +20,7 @@ func TestNewJSONPost(t *testing.T) {
 		Data string `json:"data"`
 	}
 
-	a := assert.NewAssert(t)
+	a := assert.New(t)
 
 	req, err := web.NewJSONPost("/", testContent{"hello"})
 	if err != nil {
@@ -69,7 +69,7 @@ type closeTest struct {
 
 // TODO: how to test if Close() works
 func TestRequestWithClose(t *testing.T) {
-	a := assert.NewAssert(t)
+	a := assert.New(t)
 
 	tests := []closeTest{
 		{
@@ -120,7 +120,7 @@ func TestRequestWithClose(t *testing.T) {
 }
 
 func TestShouldRetry(t *testing.T) {
-	a := assert.NewAssert(t)
+	a := assert.New(t)
 
 	tests := []struct {
 		code   int
@@ -141,7 +141,7 @@ func TestShouldRetry(t *testing.T) {
 }
 
 func TestIsTimeoutErr(t *testing.T) {
-	a := assert.NewAssert(t)
+	a := assert.New(t)
 
 	tests := []struct {
 		isTimeout bool
@@ -159,7 +159,7 @@ func TestIsTimeoutErr(t *testing.T) {
 }
 
 func TestBackoff_Next(t *testing.T) {
-	a := assert.NewAssert(t)
+	a := assert.New(t)
 
 	var (
 		minTimeout  = 10
@@ -186,7 +186,7 @@ type retryTest struct {
 }
 
 func TestClientDo(t *testing.T) {
-	a := assert.NewAssert(t)
+	a := assert.New(t)
 
 	tests := []retryTest{
 		{

@@ -11,7 +11,7 @@ import (
 )
 
 func TestNewSemaphore(t *testing.T) {
-	a := assert.NewAssert(t)
+	a := assert.New(t)
 	const n = 5
 
 	sema := semaphore.NewSemaphore(n)
@@ -24,7 +24,7 @@ func TestNewSemaphore(t *testing.T) {
 }
 
 func TestSemaphore_ObtainRelease(t *testing.T) {
-	a := assert.NewAssert(t)
+	a := assert.New(t)
 	const n = 2 // easier to test
 
 	sema := semaphore.NewSemaphore(n)
@@ -55,7 +55,7 @@ func TestSemaphore_ObtainRelease(t *testing.T) {
 
 func TestSemaphore_Sync(t *testing.T) {
 	// TODO: better cases?
-	a := assert.NewAssert(t)
+	a := assert.New(t)
 	const n = 2 // easier to test
 	const m = 5 // #workers
 	wg := sync.WaitGroup{}
