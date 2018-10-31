@@ -14,7 +14,7 @@ func TestNewSemaphore(t *testing.T) {
 	a := assert.New(t)
 	const n = 5
 
-	sema := semaphore.NewSemaphore(n)
+	sema := semaphore.New(n)
 	a.Equal(0, sema.Count(), "No one queued")
 	a.Equal(n, sema.Capacity(), "Full cap")
 
@@ -27,7 +27,7 @@ func TestSemaphore_ObtainRelease(t *testing.T) {
 	a := assert.New(t)
 	const n = 2 // easier to test
 
-	sema := semaphore.NewSemaphore(n)
+	sema := semaphore.New(n)
 
 	a.True(!sema.Release(), "Release on full returns false immediately")
 
@@ -61,7 +61,7 @@ func TestSemaphore_Sync(t *testing.T) {
 	wg := sync.WaitGroup{}
 	ctx := context.Background()
 
-	sema := semaphore.NewSemaphore(n)
+	sema := semaphore.New(n)
 	for i := 0; i < m; i++ {
 		go func() {
 			wg.Add(1)

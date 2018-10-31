@@ -93,3 +93,7 @@ func NewSemaphore(n int) Semaphore {
 		closed: false,
 	}
 }
+
+// New is a func alias for NewSemaphore. The name
+// NewSemaphore is reduncdant but kept for compatibility.
+var New = NewSemaphore
